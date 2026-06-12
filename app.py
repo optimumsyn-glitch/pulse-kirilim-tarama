@@ -1,70 +1,60 @@
-import streamlit as st
 import yfinance as yf
 import pandas as pd
 import numpy as np
 import warnings
 from datetime import datetime
 import time
-import io
-from openpyxl import Workbook
-from openpyxl.styles import PatternFill, Font, Alignment, Border, Side
-from openpyxl.utils.dataframe import dataframe_to_rows
+import os
 
 warnings.filterwarnings("ignore")
 
-# ==================== ŞİFRE KORUMASI ====================
-if "authenticated" not in st.session_state:
-    st.session_state.authenticated = False
+# ==================== PİNESCRİPT AYARLARI ====================
+left_len = right_len = 5
+donchian_period = 20
+rsi_length = 14
+rsi_overbought = 70
+rsi_oversold = 30
+atr_period = 14
+volume_lookback = 20
+adx_length = 14
+BREAKOUT_MULTIPLIER = 1.02
+MIN_STRENGTH = 2.5
 
-def check_password():
-    if st.session_state.authenticated:
-        return True
+broken_res = {}
 
-    st.title("Pulse Kırılım Tarayıcı")
-    st.markdown("Direnç kırılımı sinyalleri – sadece yetkili kullanıcılar içindir.")
-    password = st.text_input("Şifreyi girin", type="password")
+# ==================== PERİYOT SEÇİMİ ====================
+print("=== Pulse Kırılım Tarayıcı ===")
+print("Zaman Dilimi Seçin:")
+print("1 → 1 Saat")
+print("2 → 4 Saat")
+print("3 → Günlük")
+print("4 → Haftalık")
+print("5 → Aylık")
 
-    if st.button("Giriş"):
-        # Şifreyi buradan değiştir (istediğin şifre)
-        if password == "pulse2026":
-            st.session_state.authenticated = True
-            st.success("Giriş başarılı!")
-            st.rerun()
-        else:
-            st.error("Yanlış şifre")
-    return False
-
-if not check_password():
-    st.stop()
-
-# ==================== SIDEBAR AYARLARI ====================
-st.title("Pulse Kırılım Tarayıcı")
-st.write("Direnç kırılımı (breakout) sinyalleri – RSI, Hacim, ADX, MACD, Momentum onaylı")
-
-with st.sidebar:
-    st.header("Tarama Ayarları")
-    left_len = st.slider("Pivot Left Len", 3, 10, 5)
-    right_len = st.slider("Pivot Right Len", 3, 10, 5)
-    donchian_period = st.slider("Donchian Period", 10, 50, 20)
-    rsi_length = st.slider("RSI Length", 7, 21, 14)
-    rsi_overbought = st.slider("RSI Overbought", 60, 80, 70)
-    rsi_oversold = st.slider("RSI Oversold", 20, 40, 30)
-    atr_period = st.slider("ATR Period", 7, 21, 14)
-    volume_lookback = st.slider("Volume Lookback", 10, 50, 20)
-    adx_length = st.slider("ADX Length", 7, 21, 14)
-    BREAKOUT_MULTIPLIER = st.slider("Breakout Çarpanı", 1.00, 1.10, 1.02, 0.01)
-    MIN_STRENGTH = st.slider("Minimum Güç", 2.0, 4.0, 2.5, 0.1)
-    sleep_time = st.number_input("Hisse arası bekleme (sn)", 0.05, 2.0, 0.1)
+secim = input("Seçiminiz (1-5): ").strip()
+tf_map = {
+    "1": {"name": "1h",  "interval": "1h",  "period": "60d"},
+    "2": {"name": "4h",  "interval": "1h",  "period": "60d"},
+    "3": {"name": "daily","interval": "1d",  "period": "120d"},
+    "4": {"name": "weekly","interval": "1wk", "period": "3y"},
+    "5": {"name": "monthly","interval": "1mo", "period": "5y"}
+}
+tf = tf_map.get(secim, {"name": "daily", "interval": "1d", "period": "120d"})
+print(f"\nSeçilen Periyot: {tf['name'].upper()}\n")
 
 # ==================== HİSSE LİSTESİ ====================
 symbols = [
-    'A1CAP', 'A1YEN', 'ACSEL', 'ADEL', 'ADESE', 'ADGYO', 'AEFES', 'AFYON', 'AGESA', 'AGHOL', 'AGROT', 'AGYO', 'AHGAZ', 'AHSGY', 'AKBNK', 'AKCNS', 'AKENR', 'AKFGY', 'AKFIS', 'AKFYE', 'AKGRT', 'AKMGY', 'AKSA', 'AKSEN', 'AKSUE', 'AKYHO', 'ALARK', 'ALCAR', 'ALCTL', 'ALFAS', 'ALGYO', 'ALKA', 'ALKIM', 'ALKLC', 'ALTNY', 'ALVES', 'ANELE', 'ANGEN', 'ANHYT', 'APBDL', 'APLIB', 'APMDL', 'APX30', 'ARASE', 'ARCLK', 'ARDYZ', 'ARENA', 'ARMGD', 'ARSAN', 'ARTMS', 'ARZUM', 'ASELS', 'ASGYO', 'ASTOR', 'ASUZU', 'ATAKP', 'ATATP', 'ATEKS', 'ATLAS', 'ATSYH', 'AVGYO', 'AVHOL', 'AVOD', 'AVPGY', 'AVTUR', 'AYCES', 'AYDEM', 'AYEN', 'AYES', 'AYGAZ', 'AZTEK', 'BAGFS', 'BAHKM', 'BAKAB', 'BALAT', 'BALSU', 'BANVT', 'BARMA', 'BASCM', 'BASGZ', 'BAYRK', 'BEGYO', 'BERA', 'BESLR', 'BEYAZ', 'BFREN', 'BIENY', 'BIGCH', 'BIGEN', 'BIMAS', 'BINBN', 'BINHO', 'BIOEN', 'BIZIM', 'BJKAS', 'BLCYT', 'BLUME', 'BMSCH', 'BMSTL', 'BNTAS', 'BOBET', 'BORLS', 'BORSK', 'BOSSA', 'BRISA', 'BRKSN', 'BRKVY', 'BRLSM', 'BRMEN', 'BRSAN', 'BRYAT', 'BSOKE', 'BTCIM', 'BUCIM', 'BULGS', 'BURCE', 'BURVA', 'BVSAN', 'BYDNR', 'CANTE', 'CASA', 'CATES', 'CCOLA', 'CELHA', 'CEMAS', 'CEMTS', 'CEMZY', 'CEOEM', 'CGCAM', 'CIMSA', 'CLEBI', 'CMBTN', 'CMENT', 'CONSE', 'COSMO', 'CRDFA', 'CRFSA', 'CUSAN', 'CVKMD', 'CWENE', 'DAGI', 'DAPGM', 'DARDL', 'DCTTR', 'DERHL', 'DERIM', 'DESA', 'DESPC', 'DEVA', 'DGATE', 'DGGYO', 'DGNMO', 'DIRIT', 'DITAS', 'DMRGD', 'DMSAS', 'DNISI', 'DOAS', 'DOBUR', 'DOCO', 'DOFER', 'DOFRB', 'DOGUB', 'DOHOL', 'DOKTA', 'DSTKF', 'DUNYH', 'DURDO', 'DURKN', 'DYOBY', 'DZGYO', 'EBEBK', 'ECILC', 'ECZYT', 'EDATA', 'EDIP', 'EFORC', 'EGEEN', 'EGEGY', 'EGEPO', 'EGGUB', 'EGPRO', 'EGSER', 'EKGYO', 'EKIZ', 'EKOS', 'EKSUN', 'ELITE', 'EMKEL', 'EMNIS', 'ENDAE', 'ENERY', 'ENJSA', 'ENKAI', 'ENSRI', 'ENTRA', 'EPLAS', 'ERBOS', 'ERCB', 'EREGL', 'ERSU', 'ESCAR', 'ESCOM', 'ESEN', 'ETILR', 'ETYAT', 'EUKYO', 'EUPWR', 'EUREN', 'EUYO', 'EYGYO', 'FENER', 'FLAP', 'FMIZP', 'FONET', 'FORTE', 'FRIGO', 'FZLGY', 'GARAN', 'GARFA', 'GEDIK', 'GEDZA', 'GENIL', 'GENTS', 'GEREL', 'GESAN', 'GLBMD', 'GLCVY', 'GLDTR', 'GLRMK', 'GLRYH', 'GMSTR', 'GMTAS', 'GOKNR', 'GOLTS', 'GOODY', 'GOZDE', 'GRNYO', 'GRSEL', 'GRTHO', 'GSDDE', 'GSDHO', 'GSRAY', 'GUBRF', 'GUNDG', 'GWIND', 'GZNMI', 'HALKB', 'HATEK', 'HATSN', 'HDFGS', 'HEDEF', 'HEKTS', 'HKTM', 'HLGYO', 'HOROZ', 'HRKET', 'HTTBT', 'HUBVC', 'HUNER', 'HURGZ', 'ICBCT', 'ICUGS', 'IDGYO', 'IEYHO', 'IHAAS', 'IHEVA', 'IHGZT', 'IHLAS', 'IHLGM', 'IHYAY', 'IMASM', 'INDES', 'INFO', 'INGRM', 'INTEK', 'INTEM', 'INVEO', 'INVES', 'IPEKE', 'ISBIR', 'ISBTR', 'ISCTR', 'ISDMR', 'ISFIN', 'ISGLK', 'ISGSY', 'ISGYO', 'ISKPL', 'ISMEN', 'ISSEN', 'IZENR', 'IZFAS', 'IZINV', 'IZMDC', 'JANTS', 'KAPLM', 'KAREL', 'KARSN', 'KARTN', 'KATMR', 'KAYSE', 'KBORU', 'KCAER', 'KCHOL', 'KENT', 'KERVN', 'KFEIN', 'KGYO', 'KIMMR', 'KLGYO', 'KLKIM', 'KLMSN', 'KLRHO', 'KLSER', 'KLSYN', 'KLYPV', 'KMPUR', 'KNFRT', 'KOCMT', 'KONKA', 'KONTR', 'KONYA', 'KOPOL', 'KORDS', 'KOTON', 'KOZAA', 'KOZAL', 'KRDMA', 'KRDMB', 'KRGYO', 'KRONT', 'KRPLS', 'KRSTL', 'KRTEK', 'KRVGD', 'KSTUR', 'KTLEV', 'KTSKR', 'KUTPO', 'KUVVA', 'KUYAS', 'KZBGY', 'KZGYO', 'LIDER', 'LILAK', 'LKMNH', 'LMKDC', 'LRSHO', 'LUKSK', 'LYDHO', 'LYDYE', 'MAALT', 'MACKO', 'MAGEN', 'MAKIM', 'MAKTK', 'MANAS', 'MARBL', 'MARKA', 'MARMR', 'MARTI', 'MAVI', 'MEDTR', 'MEGAP', 'MEGMT', 'MEKAG', 'MEPET', 'MERCN', 'MERIT', 'MERKO', 'METRO', 'MGROS', 'MHRGY', 'MIATK', 'MMCAS', 'MNDRS', 'MNDTR', 'MOBTL', 'MOGAN', 'MOPAS', 'MPARK', 'MRGYO', 'MRSHL', 'MSGYO', 'MTRKS', 'MTRYO', 'NATEN', 'NETAS', 'NIBAS', 'NTGAZ', 'NTHOL', 'NUGYO', 'NUHCM', 'OBAMS', 'OBASE', 'ODAS', 'ODINE', 'OFSYM', 'ONCSM', 'ONRYT', 'OPK30', 'OPT25', 'OPTGY', 'OPTLR', 'OPX30', 'ORCAY', 'ORGE', 'ORMA', 'OSMEN', 'OSTIM', 'OTKAR', 'OTTO', 'OYAKC', 'OYAYO', 'OYLUM', 'OYYAT', 'OZATD', 'OZGYO', 'OZKGY', 'OZRDN', 'OZSUB', 'OZYSR', 'PAGYO', 'PAMEL', 'PAPIL', 'PARSN', 'PASEU', 'PATEK', 'PCILT', 'PEKGY', 'PENGD', 'PENTA', 'PETKM', 'PETUN', 'PGSUS', 'PINSU', 'PKART', 'PKENT', 'PLTUR', 'PNLSN', 'PNSUT', 'POLHO', 'POLTK', 'PRDGS', 'PRKAB', 'PRKME', 'PSDTC', 'PSGYO', 'QNBFK', 'QNBTR', 'QTEMZ', 'QUAGR', 'RALYH', 'RAYSG', 'REEDR', 'RGYAS', 'RNPOL', 'RTALB', 'RUBNS', 'RUZYE', 'RYGYO', 'RYSAS', 'SAFKR', 'SAHOL', 'SAMAT', 'SANEL', 'SANFM', 'SANKO', 'SARKY', 'SASA', 'SDTTR', 'SEGMN', 'SEGYO', 'SEKFK', 'SEKUR', 'SELEC', 'SELVA', 'SERNT', 'SILVR', 'SISE', 'SKBNK', 'SKTAS', 'SKYLP', 'SKYMD', 'SMART', 'SMRTG', 'SMRVA', 'SNGYO', 'SNICA', 'SNKRN', 'SNPAM', 'SODSN', 'SOKE', 'SOKM', 'SONME', 'SRVGY', 'SUMAS', 'SUNTK', 'SURGY', 'SUWEN', 'TABGD', 'TARKM', 'TATEN', 'TATGD', 'TAVHL', 'TBORG', 'TCELL', 'TCKRC', 'TDGYO', 'TEHOL', 'TEKTU', 'TERA', 'TEZOL', 'TGSAS', 'THYAO', 'TKFEN', 'TKNSA', 'TLMAN', 'TMSN', 'TNZTP', 'TOASO', 'TRCAS', 'TRGYO', 'TRHOL', 'TRILC', 'TSKB', 'TSPOR', 'TTKOM', 'TTRAK', 'TUCLK', 'TUKAS', 'TUPRS', 'TUREX', 'TURGG', 'TURSG', 'UFUK', 'ULAS', 'ULKER', 'ULUFA', 'ULUSE', 'ULUUN', 'UNLU', 'USAK', 'USDTR', 'VAKBN', 'VAKFN', 'VAKKO', 'VANGD', 'VBTYZ', 'VERTU', 'VERUS', 'VESBE', 'VESTL', 'VKFYO', 'VKGYO', 'VKING', 'VRGYO', 'VSNMD', 'YAPRK', 'YATAS', 'YAYLA', 'YBTAS', 'YEOTK', 'YESIL', 'YGGYO', 'YGYO', 'YIGIT', 'YKBNK', 'YKSLN', 'YONGA', 'YUNSA', 'YYAPI', 'YYLGD', 'Z30EA', 'Z30KE', 'Z30KP', 'ZEDUR', 'ZELOT', 'ZGOLD', 'ZOREN', 'ZPBDL', 'ZPLIB', 'ZPT10', 'ZPX30', 'ZRE20', 'ZRGYO', 'ZSR25'
+    'A1CAP', 'A1YEN', 'ACSEL', 'ADEL', 'ADESE', 'ADGYO', 'AEFES', 'AFYON', 'AGESA', 'AGHOL', 'AGROT', 'AGYO', 'AHGAZ', 'AHSGY', 'AKBNK', 'AKCNS', 'AKENR', 'AKFGY', 'AKFIS', 'AKFYE', 'AKGRT', 'AKMGY', 'AKSA', 'AKSEN', 'AKSUE', 'AKYHO', 'ALARK', 'ALCAR', 'ALCTL', 'ALFAS', 'ALGYO', 'ALKA', 'ALKIM', 'ALKLC', 'ALTNY', 'ALVES', 'ANELE', 'ANGEN', 'ANHYT', 'APBDL', 'APLIB', 'APMDL', 'APX30', 'ARASE', 'ARCLK', 'ARDYZ', 'ARENA', 'ARMGD', 'ARSAN', 'ARTMS', 'ARZUM', 'ASELS', 'ASGYO', 'ASTOR', 'ASUZU', 'ATAKP', 'ATATP', 'ATEKS', 'ATLAS', 'ATSYH', 'AVGYO', 'AVHOL', 'AVOD', 'AVPGY', 'AVTUR', 'AYCES', 'AYDEM', 'AYEN', 'AYES', 'AYGAZ', 'AZTEK', 'BAGFS', 'BAHKM', 'BAKAB', 'BALAT', 'BALSU', 'BANVT', 'BARMA', 'BASCM', 'BASGZ', 'BAYRK', 'BEGYO', 'BERA', 'BESLR', 'BEYAZ', 'BFREN', 'BIENY', 'BIGCH', 'BIGEN', 'BIMAS', 'BINBN', 'BINHO', 'BIOEN', 'BIZIM', 'BJKAS', 'BLCYT', 'BLUME', 'BMSCH', 'BMSTL', 'BNTAS', 'BOBET', 'BORLS', 'BORSK', 'BOSSA', 'BRISA', 'BRKSN', 'BRKVY', 'BRLSM', 'BRMEN', 'BRSAN', 'BRYAT', 'BSOKE', 'BTCIM', 'BUCIM', 'BULGS', 'BURCE', 'BURVA', 'BVSAN', 'BYDNR', 'CANTE', 'CASA', 'CATES', 'CCOLA', 'CELHA', 'CEMAS', 'CEMTS', 'CEMZY', 'CEOEM', 'CGCAM', 'CIMSA', 'CLEBI', 'CMBTN', 'CMENT', 'CONSE', 'COSMO', 'CRDFA', 'CRFSA', 'CUSAN', 'CVKMD', 'CWENE', 'DAGI', 'DAPGM', 'DARDL', 'DCTTR', 'DERHL', 'DERIM', 'DESA', 'DESPC', 'DEVA', 'DGATE', 'DGGYO', 'DGNMO', 'DIRIT', 'DITAS', 'DMRGD', 'DMSAS', 'DNISI', 'DOAS', 'DOBUR', 'DOCO', 'DOFER', 'DOFRB', 'DOGUB', 'DOHOL', 'DOKTA', 'DSTKF', 'DUNYH', 'DURDO', 'DURKN', 'DYOBY', 'DZGYO', 'EBEBK', 'ECILC', 'ECZYT', 'EDATA', 'EDIP', 'EFORC', 'EGEEN', 'EGEGY', 'EGEPO', 'EGGUB', 'EGPRO', 'EGSER', 'EKGYO', 'EKIZ', 'EKOS', 'EKSUN', 'ELITE', 'EMKEL', 'EMNIS', 'ENDAE', 'ENERY', 'ENJSA', 'ENKAI', 'ENSRI', 'ENTRA', 'EPLAS', 'ERBOS', 'ERCB', 'EREGL', 'ERSU', 'ESCAR', 'ESCOM', 'ESEN', 'ETILR', 'ETYAT', 'EUKYO', 'EUPWR', 'EUREN', 'EUYO', 'EYGYO', 'FENER', 'FLAP', 'FMIZP', 'FONET', 'FORTE', 'FRIGO', 'FZLGY', 'GARAN', 'GARFA', 'GEDIK', 'GEDZA', 'GENIL', 'GENTS', 'GEREL', 'GESAN', 'GLBMD', 'GLCVY', 'GLDTR', 'GLRMK', 'GLRYH', 'GMSTR', 'GMTAS', 'GOKNR', 'GOLTS', 'GOODY', 'GOZDE', 'GRNYO', 'GRSEL', 'GRTHO', 'GSDDE', 'GSDHO', 'GSRAY', 'GUBRF', 'GUNDG', 'GWIND', 'GZNMI', 'HALKB', 'HATEK', 'HATSN', 'HDFGS', 'HEDEF', 'HEKTS', 'HKTM', 'HLGYO', 'HOROZ', 'HRKET', 'HTTBT', 'HUBVC', 'HUNER', 'HURGZ', 'ICBCT', 'ICUGS', 'IDGYO', 'IEYHO', 'IHAAS', 'IHEVA', 'IHGZT', 'IHLAS', 'IHLGM', 'IHYAY', 'IMASM', 'INDES', 'INFO', 'INGRM', 'INTEK', 'INTEM', 'INVEO', 'INVES', 'IPEKE', 'ISBIR', 'ISBTR', 'ISCTR', 'ISDMR', 'ISFIN', 'ISGLK', 'ISGSY', 'ISGYO', 'ISKPL', 'ISMEN', 'ISSEN', 'IZENR', 'IZFAS', 'IZINV', 'IZMDC', 'JANTS', 'KAPLM', 'KAREL', 'KARSN', 'KARTN', 'KATMR', 'KAYSE', 'KBORU', 'KCAER', 'KCHOL', 'KENT', 'KERVN', 'KFEIN', 'KGYO', 'KIMMR', 'KLGYO', 'KLKIM', 'KLMSN', 'KLRHO', 'KLSER', 'KLSYN', 'KLYPV', 'KMPUR', 'KNFRT', 'KOCMT', 'KONKA', 'KONTR', 'KONYA', 'KOPOL', 'KORDS', 'KOTON', 'KOZAA', 'KOZAL', 'KRDMA', 'KRDMB', 'KRGYO', 'KRONT', 'KRPLS', 'KRSTL', 'KRTEK', 'KRVGD', 'KSTUR', 'KTLEV', 'KTSKR', 'KUTPO', 'KUVVA', 'KUYAS', 'KZBGY', 'KZGYO', 'LIDER', 'LILAK', 'LKMNH', 'LMKDC', 'LRSHO', 'LUKSK', 'LYDHO', 'LYDYE', 'MAALT', 'MACKO', 'MAGEN', 'MAKIM', 'MAKTK', 'MANAS', 'MARBL', 'MARKA', 'MARMR', 'MARTI', 'MAVI', 'MEDTR', 'MEGAP', 'MEGMT', 'MEKAG', 'MEPET', 'MERCN', 'MERIT', 'MERKO', 'METRO', 'MGROS', 'MHRGY', 'MIATK', 'MMCAS', 'MNDRS', 'MNDTR', 'MOBTL', 'MOGAN', 'MOPAS', 'MPARK', 'MRGYO', 'MRSHL', 'MSGYO', 'MTRKS', 'MTRYO', 'NATEN', 'NETAS', 'NIBAS', 'NTGAZ', 'NTHOL', 'NUGYO', 'NUHCM', 'OBAMS', 'OBASE', 'ODAS', 'ODINE', 'OFSYM', 'ONCSM', 'ONRYT', 'OPK30', 'OPT25', 'OPTGY', 'OPTLR', 'OPX30', 'ORCAY', 'ORGE', 'ORMA', 'OSMEN', 'OSTIM', 'OTKAR', 'OTTO', 'OYAKC', 'OYAYO', 'OYLUM', 'OYYAT', 'OZATD', 'OZGYO', 'OZKGY', 'OZRDN', 'OZSUB', 'OZYSR', 'PAGYO', 'PAMEL', 'PAPIL', 'PARSN', 'PASEU', 'PATEK', 'PCILT', 'PEKGY', 'PENGD', 'PENTA', 'PETKM', 'PETUN', 'PGSUS', 'PINSU', 'PKART', 'PKENT', 'PLTUR', 'PNLSN', 'PNSUT', 'POLHO', 'POLTK', 'PRDGS', 'PRKAB', 'PRKME', 'PSDTC', 'PSGYO', 'QNBFK', 'QNBTR', 'QTEMZ', 'QUAGR', 'RALYH', 'RAYSG', 'REEDR', 'RGYAS', 'RNPOL', 'RTALB', 'RUBNS', 'RUZYE', 'RYGYO', 'RYSAS', 'SAFKR', 'SAHOL', 'SAMAT', 'SANEL', 'SANFM', 'SANKO', 'SARKY', 'SASA', 'SDTTR', 'SEGMN', 'SEGYO', 'SEKFK', 'SEKUR', 'SELEC', 'SELVA', 'SERNT', 'SILVR', 'SISE', 'SKBNK', 'SKTAS', 'SKYLP', 'SKYMD', 'SMART', 'SMRTG', 'SMRVA', 'SNGYO', 'SNICA', 'SNKRN', 'SNPAM', 'SODSN', 'SOKE', 'SOKM', 'SONME', 'SRVGY', 'SUMAS', 'SUNTK', 'SURGY', 'SUWEN', 'TABGD', 'TARKM', 'TATEN', 'TATGD', 'TAVHL', 'TBORG', 'TCELL', 'TCKRC', 'TDGYO', 'TEHOL', 'TEKTU', 'TERA', 'TEZOL', 'TGSAS', 'THYAO', 'TKFEN', 'TKNSA', 'TLMAN', 'TMSN', 'TNZTP', 'TOASO', 'TRCAS', 'TRGYO', 'TRHOL', 'TRILC', 'TSKB', 'TSPOR', 'TTKOM', 'TTRAK', 'TUCLK', 'TUKAS', 'TUPRS', 'TUREX', 'TURGG', 'TURSG', 'UFUK', 'ULAS', 'ULKER', 'ULUFA', 'ULUSE', 'ULUUN', 'UNLU', 'USAK', 'USDTR', 'VAKBN', 'VAKFN', 'VAKKO', 'VANGD', 'VBTYZ', 'VERTU', 'VERUS', 'VESBE', 'VESTL', 'VKFYO', 'VKGYO', 'VKING', 'VRGYO', 'VSNMD', 'YAPRK', 'YATAS', 'YAYLA', 'YBTAS', 'YEOTK', 'YESIL', 'YGGYO', 'YGYO', 'YIGIT', 'YKBNK', 'YKSLN', 'YONGA', 'YUNSA', 'YYAPI', 'YYLGD', 'Z30EA', 'Z30KE', 'Z30KP', 'ZEDUR', 'ZELOT', 'ZGOLD', 'ZOREN', 'ZPBDL', 'ZPLIB', 'ZPT10', 'ZPX30', 'ZRE20', 'ZRGYO', 'ZSR25',
+    # Eklediğin hisseler
+    'MCARD', 'ZGYO', 'ZERGY', 'NETCD', 'ATATR'
 ]
 
 valid_symbols = [s for s in symbols if len(s) >= 3 and s.isalpha() and s not in ['CUSAN', 'APMDL']]
 bist_symbols = [s + '.IS' for s in valid_symbols]
 
-# ==================== FONKSİYONLAR ====================
+print(f"{len(bist_symbols)} hisse taranıyor... (~8-15 dk)\n")
+
+# ==================== PIVOT HIGH ====================
 def ta_pivothigh(series, left, right):
     series = series.values.flatten()
     result = np.full(len(series), np.nan)
@@ -73,7 +63,19 @@ def ta_pivothigh(series, left, right):
             result[i] = series[i]
     return pd.Series(result)
 
+# ==================== 4 SAAT RESAMPLE ====================
+def resample_to_4h(df):
+    if df.empty: return df
+    df = df.copy()
+    df.index = pd.to_datetime(df.index)
+    ohlc = {'Open': 'first', 'High': 'max', 'Low': 'min', 'Close': 'last', 'Volume': 'sum'}
+    return df.resample('4H').agg(ohlc).dropna()
+
+# ==================== İNDİKATÖRLER ====================
 def calculate_indicators_daily(df):
+    if tf["name"] == "4h":
+        df = resample_to_4h(df)
+    
     df = df.copy().reset_index(drop=True)
     high = df['High'].values.flatten()
     low = df['Low'].values.flatten()
@@ -122,6 +124,7 @@ def calculate_indicators_daily(df):
 
     return df
 
+# ==================== YAKINLIK ve YORUM (Değiştirilmedi) ====================
 def get_yakinlik_kategori(gain_pct):
     if gain_pct <= 3:
         return f"{gain_pct:.1f}".replace('.', ','), "Çok Yakın"
@@ -134,7 +137,6 @@ def get_yakinlik_kategori(gain_pct):
 
 def generate_yorum(guc, yakinlik_kategori, yakinlik_pct_str):
     pct = float(yakinlik_pct_str.replace(',', '.'))
-    
     if guc >= 4.0:
         if pct <= 3.0:
             return "Direnci kırdı, artık direnç destek oldu. Kısa vadede kar realizasyonu gelebilir, stop seviyesi biraz altı takip edilmeli."
@@ -142,16 +144,15 @@ def generate_yorum(guc, yakinlik_kategori, yakinlik_pct_str):
             return "Güçlü kırılım gerçekleşti. Destek olarak çalışabilir. Kar satışları kısa vadede gelebilir, dikkatli olun."
         else:
             return "Çok güçlü kırılım ama fiyat bayağı uzaklaştı. Kar realizasyonunu unutmayın, kısa vadeli düzeltme gelebilir."
-    
     elif guc >= 3.0:
         if pct <= 7.0:
             return "Kırılım onaylandı, direnç → destek dönüşümü olası. Kar realizasyonu riski orta seviyede. Stop seviyesi direncin biraz altına konulabilir."
         else:
             return "Kırılım gerçekleşti ancak mesafe açıldı. Kar satışları gelebilir, kısa vadeli dikkat gerekli."
-    
-    else:  # 2.5 - 2.99 arası
+    else:
         return "Kırılım eşiğinde güçlü sinyal. Direnç destek olabilir ama onay bekleniyor. Kar realizasyonu kısa vadede gelebilir."
 
+# ==================== SİNYAL TESPİT (Değiştirilmedi) ====================
 def detect_very_strong_breakout(df_daily, current_close, symbol):
     if len(df_daily) < 20:
         return None
@@ -189,138 +190,141 @@ def detect_very_strong_breakout(df_daily, current_close, symbol):
     gain_pct = (current_close / resistance - 1) * 100
     uzaklik, kategori = get_yakinlik_kategori(gain_pct)
 
+    key = symbol.replace('.IS', '')
+    if key in broken_res and abs(broken_res[key] - resistance) < 1e-6:
+        return None
+
+    broken_res[key] = resistance
+
     yorum = generate_yorum(strength, kategori, uzaklik)
 
     return {
-        'Sembol': symbol.replace('.IS', ''),
+        'Sembol': key,
         'Tür': 'Kırılım AL',
-        'Kategori': 'Çok Güçlü' if strength >= 4.0 else 'Güçlü' if strength >= 3.0 else 'Orta Güçlü',
+        'Kategori': 'Çok Güçlü' if strength >= 4.0 else 'Güçlü',
         'Güç': round(strength, 1),
         'Fiyat': round(current_close, 2),
         'Direnç': round(resistance, 2),
         'Yakınlık %': uzaklik,
         'Yakınlık': kategori,
-        'Yorum': yorum
+        'Yorum': yorum,
+        'Periyot': tf["name"].upper()
     }
 
 # ==================== TARAMA ====================
 results = []
+print(f"\nTarama başladı ({tf['name'].upper()}): {datetime.now().strftime('%d.%m.%Y %H:%M')}\n")
 
-if st.button("Tarama Başlat (~8-15 dk)"):
-    with st.spinner("589 hisse taranıyor..."):
-        progress_bar = st.progress(0)
-        status_text = st.empty()
+for i, symbol in enumerate(bist_symbols):
+    try:
+        data_daily = yf.download(symbol, period=tf["period"], interval=tf["interval"], progress=False, auto_adjust=True)
+        if data_daily.empty or len(data_daily) < 20:
+            continue
 
-        for i, symbol in enumerate(bist_symbols):
-            try:
-                data_daily = yf.download(symbol, period='60d', interval='1d', progress=False, auto_adjust=True)
-                if data_daily.empty or len(data_daily) < 20:
-                    continue
+        current_close = float(data_daily['Close'].iloc[-1])
+        data_daily = calculate_indicators_daily(data_daily)
+        result = detect_very_strong_breakout(data_daily, current_close, symbol)
+        if result:
+            results.append(result)
+            print(f"BULUNDU → {result['Sembol']} | Güç: {result['Güç']} | Yakınlık: {result['Yakınlık']} ({result['Yakınlık %']})")
 
-                current_close = float(data_daily['Close'].iloc[-1])
-                data_daily = calculate_indicators_daily(data_daily)
-                result = detect_very_strong_breakout(data_daily, current_close, symbol)
-                if result:
-                    results.append(result)
-                    st.write(f"BULUNDU → {result['Sembol']} | Güç: {result['Güç']} | Yakınlık: {result['Yakınlık']} ({result['Yakınlık %']})")
+        if (i + 1) % 50 == 0:
+            print(f"[{i+1}/{len(bist_symbols)}] Bulunan: {len(results)}")
 
-                progress = (i + 1) / len(bist_symbols)
-                progress_bar.progress(progress)
-                status_text.text(f"[{i+1}/{len(bist_symbols)}] İşleniyor... Bulunan: {len(results)}")
+    except Exception as e:
+        continue
+    time.sleep(0.1)
 
-            except Exception as e:
-                continue
-            time.sleep(sleep_time)
+# ==================== SONUÇLAR ====================
+df_results = pd.DataFrame(results)
 
-    # ==================== SONUÇ GÖSTERİMİ + STİLLİ EXCEL ====================
-    if results:
-        df = pd.DataFrame(results)
-        # Türkçe formatlama (virgül, tırnak)
-        df['Güç'] = df['Güç'].astype(str).str.replace('.', ',')
-        df['Fiyat'] = df['Fiyat'].astype(str).str.replace('.', ',')
-        df['Direnç'] = df['Direnç'].astype(str).str.replace('.', ',')
-        df['Yakınlık %'] = df['Yakınlık %'].astype(str).str.replace('.', ',')
+desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
 
-        # Sıralama
-        df = df.sort_values('Güç', ascending=False).reset_index(drop=True)
+if not df_results.empty:
+    df_results['Güç'] = "'" + df_results['Güç'].astype(str).str.replace('.', ',')
+    df_results['Fiyat']   = "'" + df_results['Fiyat'].astype(float).round(2).astype(str).str.replace('.', ',')
+    df_results['Direnç']  = "'" + df_results['Direnç'].astype(float).round(2).astype(str).str.replace('.', ',')
 
-        st.success(f"{len(df)} kırılım sinyali bulundu!")
-        st.dataframe(df)
+    df_results['Yakınlık_Num'] = df_results['Yakınlık %'].str.replace(',', '.').astype(float)
+    df_results = df_results.sort_values(
+        ['Güç', 'Yakınlık_Num'], ascending=[False, True]
+    ).drop(columns=['Yakınlık_Num']).reset_index(drop=True)
 
-        # Stilli Excel indirme
-        output = io.BytesIO()
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Kırılım Sinyalleri"
+    df_results['Yorum'] = df_results['Yorum'].str.wrap(60)
 
-        # Başlık
-        for col_num, title in enumerate(df.columns, 1):
-            cell = ws.cell(row=1, column=col_num, value=title)
-            cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill("solid", fgColor="37474F")
-            cell.alignment = Alignment(horizontal="center")
+    top10 = df_results.head(10)
+    esik = df_results[
+        (df_results['Güç'].str.replace("'", '').str.replace(',', '.').astype(float) >= 2.0) &
+        (df_results['Güç'].str.replace("'", '').str.replace(',', '.').astype(float) < 2.5)
+    ].sort_values('Yakınlık %', ascending=True)
 
-        # Veri
-        for r_idx, row in enumerate(dataframe_to_rows(df, index=False, header=False), 2):
-            for c_idx, value in enumerate(row, 1):
-                ws.cell(row=r_idx, column=c_idx, value=value)
-
-        # Stil (güç seviyesine göre)
-        critical_fill = PatternFill("solid", fgColor="BBDEFB")  # çok güçlü - mavi
-        strong_fill = PatternFill("solid", fgColor="E8F5E9")    # güçlü - yeşil
-
-        for row_idx in range(2, len(df) + 2):
-            guc_str = str(ws.cell(row=row_idx, column=4).value)  # Güç sütunu (4. sütun)
-            try:
-                guc = float(guc_str.replace(',', '.'))
-            except:
-                guc = 0
-
-            is_critical = guc >= 4.0
-            is_strong = guc >= 3.0
-
-            row_height = 80 if is_critical else 55 if is_strong else 40
-            ws.row_dimensions[row_idx].height = row_height
-
-            fill_color = critical_fill if is_critical else strong_fill if is_strong else None
-
-            if fill_color:
-                for col_idx in range(1, len(df.columns) + 1):
-                    ws.cell(row=row_idx, column=col_idx).fill = fill_color
-
-            thin_border = Border(left=Side('thin'), right=Side('thin'), top=Side('thin'), bottom=Side('thin'))
-            for col_idx in range(1, len(df.columns) + 1):
-                ws.cell(row=row_idx, column=col_idx).border = thin_border
-
-        # Sütun genişlikleri
-        for col in ws.columns:
-            max_length = 0
-            column_letter = col[0].column_letter
-            for cell in col:
-                try:
-                    if len(str(cell.value)) > max_length:
-                        max_length = len(cell.value)
-                except:
-                    pass
-            ws.column_dimensions[column_letter].width = min(max_length + 6, 90)
-
-        # Yorum wrap text
-        yorum_col = df.columns.get_loc("Yorum") + 1
-        for row in ws.iter_rows(min_row=2, max_row=ws.max_row, min_col=yorum_col, max_col=yorum_col):
-            for cell in row:
-                cell.alignment = Alignment(wrap_text=True, vertical="center")
-
-        wb.save(output)
-        output.seek(0)
-
-        st.download_button(
-            label="Stilli Excel İndir (mavi/yeşil boyalı)",
-            data=output,
-            file_name=f"Pulse_Kirilim_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-
+    print("\n" + "═"*140)
+    print(f"İLK 10 ÇOK GÜÇLÜ / GÜÇLÜ KIRILIM ({tf['name'].upper()})".center(140))
+    print("═"*140)
+    if not top10.empty:
+        print(top10[['Sembol','Güç','Fiyat','Direnç','Yakınlık %','Yakınlık','Yorum']].to_markdown(index=False))
     else:
-        st.warning("Bugün uygun kırılım sinyali bulunamadı.")
+        print("Henüz çok güçlü / güçlü kırılım yok.")
 
-st.info("Tarama tamamlandı. Sonuçları Excel olarak indirebilirsiniz.")
+    print("\n" + "═"*140)
+    print("KIRILIM EŞİĞİNDE OLANLAR (Güç 2.0-2.4)".center(140))
+    print("═"*140)
+    if not esik.empty:
+        print(esik[['Sembol','Güç','Fiyat','Direnç','Yakınlık %','Yakınlık','Yorum']].to_markdown(index=False))
+    else:
+        print("Eşik seviyesinde aday yok.")
+
+    # EXCEL
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M")
+    filename_xlsx = f"Pulse-TARAMA_{tf['name'].upper()}_{timestamp}.xlsx"
+    full_path_xlsx = os.path.join(desktop_path, filename_xlsx)
+
+    try:
+        with pd.ExcelWriter(full_path_xlsx, engine='openpyxl') as writer:
+            df_results[['Sembol','Tür','Kategori','Güç','Fiyat','Direnç','Yakınlık %','Yakınlık','Yorum','Periyot']].to_excel(
+                writer, sheet_name='Kırılım Sinyalleri', index=False
+            )
+            worksheet = writer.sheets['Kırılım Sinyalleri']
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            header_font = Font(bold=True, color="FFFFFF")
+            header_fill = PatternFill(start_color="1F497D", end_color="1F497D", fill_type="solid")
+            thin_border = Border(left=Side(style='thin'), right=Side(style='thin'), top=Side(style='thin'), bottom=Side(style='thin'))
+
+            for cell in worksheet[1]:
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.alignment = Alignment(horizontal='center', vertical='center')
+                cell.border = thin_border
+
+            for row in worksheet.iter_rows(min_row=2, max_row=worksheet.max_row):
+                for cell in row:
+                    cell.border = thin_border
+                    cell.alignment = Alignment(horizontal='left', vertical='center', wrap_text=True)
+
+            for col in worksheet.columns:
+                max_length = 0
+                column = col[0].column_letter
+                for cell in col:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                worksheet.column_dimensions[column].width = (max_length + 2)
+
+            worksheet.auto_filter.ref = worksheet.dimensions
+
+        print(f"\nExcel kaydedildi → {full_path_xlsx}")
+    except Exception as e:
+        print(f"Excel hatası: {e}")
+
+    # CSV Yedek
+    filename_csv = f"Pulse_{tf['name'].upper()}_{timestamp}.csv"
+    full_path_csv = os.path.join(desktop_path, filename_csv)
+    df_results.to_csv(full_path_csv, index=False, encoding='utf-8-sig', sep=';')
+    print(f"CSV kaydedildi → {full_path_csv}")
+
+else:
+    print("\nBu periyotta uygun sinyal bulunamadı.")
+
+print("\nTarama tamamlandı.")
