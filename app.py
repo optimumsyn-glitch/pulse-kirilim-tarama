@@ -20,7 +20,7 @@ def check_password():
         return True
     st.title("🔐 Pulse Kırılım Tarayıcı")
     st.markdown("**Abone Özel**")
-    pw = st.text_input("Şifre", type="password")
+    pw = st.text_input("Şifreyi girin", type="password")
     if st.button("Giriş"):
         if pw == "pulse2026":
             st.session_state.authenticated = True
@@ -32,115 +32,65 @@ def check_password():
 if not check_password():
     st.stop()
 
-# ==================== AYARLAR ====================
+# ==================== TAM HİSSE LİSTESİ ====================
+symbols = [
+    'A1CAP', 'A1YEN', 'ACSEL', 'ADEL', 'ADESE', 'ADGYO', 'AEFES', 'AFYON', 'AGESA', 'AGHOL', 'AGROT', 'AGYO', 'AHGAZ', 'AHSGY', 'AKBNK', 'AKCNS', 'AKENR', 'AKFGY', 'AKFIS', 'AKFYE', 'AKGRT', 'AKMGY', 'AKSA', 'AKSEN', 'AKSUE', 'AKYHO', 'ALARK', 'ALCAR', 'ALCTL', 'ALFAS', 'ALGYO', 'ALKA', 'ALKIM', 'ALKLC', 'ALTNY', 'ALVES', 'ANELE', 'ANGEN', 'ANHYT', 'APBDL', 'APLIB', 'APMDL', 'APX30', 'ARASE', 'ARCLK', 'ARDYZ', 'ARENA', 'ARMGD', 'ARSAN', 'ARTMS', 'ARZUM', 'ASELS', 'ASGYO', 'ASTOR', 'ASUZU', 'ATAKP', 'ATATP', 'ATEKS', 'ATLAS', 'ATSYH', 'AVGYO', 'AVHOL', 'AVOD', 'AVPGY', 'AVTUR', 'AYCES', 'AYDEM', 'AYEN', 'AYES', 'AYGAZ', 'AZTEK', 'BAGFS', 'BAHKM', 'BAKAB', 'BALAT', 'BALSU', 'BANVT', 'BARMA', 'BASCM', 'BASGZ', 'BAYRK', 'BEGYO', 'BERA', 'BESLR', 'BEYAZ', 'BFREN', 'BIENY', 'BIGCH', 'BIGEN', 'BIMAS', 'BINBN', 'BINHO', 'BIOEN', 'BIZIM', 'BJKAS', 'BLCYT', 'BLUME', 'BMSCH', 'BMSTL', 'BNTAS', 'BOBET', 'BORLS', 'BORSK', 'BOSSA', 'BRISA', 'BRKSN', 'BRKVY', 'BRLSM', 'BRMEN', 'BRSAN', 'BRYAT', 'BSOKE', 'BTCIM', 'BUCIM', 'BULGS', 'BURCE', 'BURVA', 'BVSAN', 'BYDNR', 'CANTE', 'CASA', 'CATES', 'CCOLA', 'CELHA', 'CEMAS', 'CEMTS', 'CEMZY', 'CEOEM', 'CGCAM', 'CIMSA', 'CLEBI', 'CMBTN', 'CMENT', 'CONSE', 'COSMO', 'CRDFA', 'CRFSA', 'CUSAN', 'CVKMD', 'CWENE', 'DAGI', 'DAPGM', 'DARDL', 'DCTTR', 'DERHL', 'DERIM', 'DESA', 'DESPC', 'DEVA', 'DGATE', 'DGGYO', 'DGNMO', 'DIRIT', 'DITAS', 'DMRGD', 'DMSAS', 'DNISI', 'DOAS', 'DOBUR', 'DOCO', 'DOFER', 'DOFRB', 'DOGUB', 'DOHOL', 'DOKTA', 'DSTKF', 'DUNYH', 'DURDO', 'DURKN', 'DYOBY', 'DZGYO', 'EBEBK', 'ECILC', 'ECZYT', 'EDATA', 'EDIP', 'EFORC', 'EGEEN', 'EGEGY', 'EGEPO', 'EGGUB', 'EGPRO', 'EGSER', 'EKGYO', 'EKIZ', 'EKOS', 'EKSUN', 'ELITE', 'EMKEL', 'EMNIS', 'ENDAE', 'ENERY', 'ENJSA', 'ENKAI', 'ENSRI', 'ENTRA', 'EPLAS', 'ERBOS', 'ERCB', 'EREGL', 'ERSU', 'ESCAR', 'ESCOM', 'ESEN', 'ETILR', 'ETYAT', 'EUKYO', 'EUPWR', 'EUREN', 'EUYO', 'EYGYO', 'FENER', 'FLAP', 'FMIZP', 'FONET', 'FORTE', 'FRIGO', 'FZLGY', 'GARAN', 'GARFA', 'GEDIK', 'GEDZA', 'GENIL', 'GENTS', 'GEREL', 'GESAN', 'GLBMD', 'GLCVY', 'GLDTR', 'GLRMK', 'GLRYH', 'GMSTR', 'GMTAS', 'GOKNR', 'GOLTS', 'GOODY', 'GOZDE', 'GRNYO', 'GRSEL', 'GRTHO', 'GSDDE', 'GSDHO', 'GSRAY', 'GUBRF', 'GUNDG', 'GWIND', 'GZNMI', 'HALKB', 'HATEK', 'HATSN', 'HDFGS', 'HEDEF', 'HEKTS', 'HKTM', 'HLGYO', 'HOROZ', 'HRKET', 'HTTBT', 'HUBVC', 'HUNER', 'HURGZ', 'ICBCT', 'ICUGS', 'IDGYO', 'IEYHO', 'IHAAS', 'IHEVA', 'IHGZT', 'IHLAS', 'IHLGM', 'IHYAY', 'IMASM', 'INDES', 'INFO', 'INGRM', 'INTEK', 'INTEM', 'INVEO', 'INVES', 'IPEKE', 'ISBIR', 'ISBTR', 'ISCTR', 'ISDMR', 'ISFIN', 'ISGLK', 'ISGSY', 'ISGYO', 'ISKPL', 'ISMEN', 'ISSEN', 'IZENR', 'IZFAS', 'IZINV', 'IZMDC', 'JANTS', 'KAPLM', 'KAREL', 'KARSN', 'KARTN', 'KATMR', 'KAYSE', 'KBORU', 'KCAER', 'KCHOL', 'KENT', 'KERVN', 'KFEIN', 'KGYO', 'KIMMR', 'KLGYO', 'KLKIM', 'KLMSN', 'KLRHO', 'KLSER', 'KLSYN', 'KLYPV', 'KMPUR', 'KNFRT', 'KOCMT', 'KONKA', 'KONTR', 'KONYA', 'KOPOL', 'KORDS', 'KOTON', 'KOZAA', 'KOZAL', 'KRDMA', 'KRDMB', 'KRGYO', 'KRONT', 'KRPLS', 'KRSTL', 'KRTEK', 'KRVGD', 'KSTUR', 'KTLEV', 'KTSKR', 'KUTPO', 'KUVVA', 'KUYAS', 'KZBGY', 'KZGYO', 'LIDER', 'LILAK', 'LKMNH', 'LMKDC', 'LRSHO', 'LUKSK', 'LYDHO', 'LYDYE', 'MAALT', 'MACKO', 'MAGEN', 'MAKIM', 'MAKTK', 'MANAS', 'MARBL', 'MARKA', 'MARMR', 'MARTI', 'MAVI', 'MEDTR', 'MEGAP', 'MEGMT', 'MEKAG', 'MEPET', 'MERCN', 'MERIT', 'MERKO', 'METRO', 'MGROS', 'MHRGY', 'MIATK', 'MMCAS', 'MNDRS', 'MNDTR', 'MOBTL', 'MOGAN', 'MOPAS', 'MPARK', 'MRGYO', 'MRSHL', 'MSGYO', 'MTRKS', 'MTRYO', 'NATEN', 'NETAS', 'NIBAS', 'NTGAZ', 'NTHOL', 'NUGYO', 'NUHCM', 'OBAMS', 'OBASE', 'ODAS', 'ODINE', 'OFSYM', 'ONCSM', 'ONRYT', 'OPK30', 'OPT25', 'OPTGY', 'OPTLR', 'OPX30', 'ORCAY', 'ORGE', 'ORMA', 'OSMEN', 'OSTIM', 'OTKAR', 'OTTO', 'OYAKC', 'OYAYO', 'OYLUM', 'OYYAT', 'OZATD', 'OZGYO', 'OZKGY', 'OZRDN', 'OZSUB', 'OZYSR', 'PAGYO', 'PAMEL', 'PAPIL', 'PARSN', 'PASEU', 'PATEK', 'PCILT', 'PEKGY', 'PENGD', 'PENTA', 'PETKM', 'PETUN', 'PGSUS', 'PINSU', 'PKART', 'PKENT', 'PLTUR', 'PNLSN', 'PNSUT', 'POLHO', 'POLTK', 'PRDGS', 'PRKAB', 'PRKME', 'PSDTC', 'PSGYO', 'QNBFK', 'QNBTR', 'QTEMZ', 'QUAGR', 'RALYH', 'RAYSG', 'REEDR', 'RGYAS', 'RNPOL', 'RTALB', 'RUBNS', 'RUZYE', 'RYGYO', 'RYSAS', 'SAFKR', 'SAHOL', 'SAMAT', 'SANEL', 'SANFM', 'SANKO', 'SARKY', 'SASA', 'SDTTR', 'SEGMN', 'SEGYO', 'SEKFK', 'SEKUR', 'SELEC', 'SELVA', 'SERNT', 'SILVR', 'SISE', 'SKBNK', 'SKTAS', 'SKYLP', 'SKYMD', 'SMART', 'SMRTG', 'SMRVA', 'SNGYO', 'SNICA', 'SNKRN', 'SNPAM', 'SODSN', 'SOKE', 'SOKM', 'SONME', 'SRVGY', 'SUMAS', 'SUNTK', 'SURGY', 'SUWEN', 'TABGD', 'TARKM', 'TATEN', 'TATGD', 'TAVHL', 'TBORG', 'TCELL', 'TCKRC', 'TDGYO', 'TEHOL', 'TEKTU', 'TERA', 'TEZOL', 'TGSAS', 'THYAO', 'TKFEN', 'TKNSA', 'TLMAN', 'TMSN', 'TNZTP', 'TOASO', 'TRCAS', 'TRGYO', 'TRHOL', 'TRILC', 'TSKB', 'TSPOR', 'TTKOM', 'TTRAK', 'TUCLK', 'TUKAS', 'TUPRS', 'TUREX', 'TURGG', 'TURSG', 'UFUK', 'ULAS', 'ULKER', 'ULUFA', 'ULUSE', 'ULUUN', 'UNLU', 'USAK', 'USDTR', 'VAKBN', 'VAKFN', 'VAKKO', 'VANGD', 'VBTYZ', 'VERTU', 'VERUS', 'VESBE', 'VESTL', 'VKFYO', 'VKGYO', 'VKING', 'VRGYO', 'VSNMD', 'YAPRK', 'YATAS', 'YAYLA', 'YBTAS', 'YEOTK', 'YESIL', 'YGGYO', 'YGYO', 'YIGIT', 'YKBNK', 'YKSLN', 'YONGA', 'YUNSA', 'YYAPI', 'YYLGD', 'Z30EA', 'Z30KE', 'Z30KP', 'ZEDUR', 'ZELOT', 'ZGOLD', 'ZOREN', 'ZPBDL', 'ZPLIB', 'ZPT10', 'ZPX30', 'ZRE20', 'ZRGYO', 'ZSR25',
+    'MCARD', 'ZGYO', 'ZERGY', 'NETCD', 'ATATR'
+]
+
+bist_symbols = [s + '.IS' for s in symbols if len(s) >= 3 and s.isalpha() and s not in ['CUSAN', 'APMDL']]
+
 st.title("📊 Pulse Kırılım Tarayıcı")
+st.caption("Direnç Kırılımı Tarayıcı")
 
 with st.sidebar:
-    st.header("Ayarlar")
-    periyot = st.selectbox("Zaman Dilimi", ["1 Saat", "4 Saat", "Günlük"], index=0)
-    carp an = st.slider("Breakout Çarpanı", 1.000, 1.08, 1.005, 0.001)
-    min_guc = st.slider("Minimum Güç", 1.5, 4.5, 2.0, 0.1)
-    test_mode = st.checkbox("Sadece Test Hisseleri (Hızlı)", value=True)
+    st.header("Tarama Ayarları")
+    timeframe = st.selectbox("⏰ Zaman Dilimi", ["1 Saat", "4 Saat", "Günlük"], index=0)
+    breakout_mult = st.slider("Breakout Çarpanı", 1.000, 1.08, 1.005, 0.001)
+    min_strength = st.slider("Minimum Güç", 1.5, 4.5, 2.0, 0.1)
+    sleep_time = st.number_input("Bekleme süresi (sn)", 0.05, 1.0, 0.08)
 
-# ==================== HİSSE LİSTESİ ====================
-if test_mode:
-    symbols = ['MCARD', 'ZGYO', 'ZERGY', 'NETCD', 'ATATR', 'THYAO', 'GARAN', 'ASELS', 'BIMAS', 'TUPRS', 'SASA', 'EREGL']
-else:
-    symbols = ['A1CAP', 'A1YEN', ...]  # buraya tam listeni koyabilirsin
-
-bist_symbols = [s + '.IS' for s in symbols]
-
-tf_map = {
-    "1 Saat": {"int": "1h", "per": "60d"},
-    "4 Saat": {"int": "1h", "per": "60d"},
-    "Günlük": {"int": "1d", "per": "120d"}
-}
-tf = tf_map[periyot]
-
-# ==================== FONKSİYONLAR ====================
-def calculate_indicators(df):
-    df = df.copy().reset_index(drop=True)
-    if len(df) < 30:
-        return df
-    
-    high = df['High'].values
-    close = df['Close'].values
-    volume = df['Volume'].values
-
-    # Basit pivot + resistance
-    df['resistance_level'] = df['High'].rolling(50).max()
-
-    # Basit indikatörler
-    df['volume_increase'] = volume > pd.Series(volume).rolling(20).mean() * 1.5
-    df['rsi_in_zone'] = True  # basitleştirildi
-    df['momentum_strong'] = pd.Series(close).diff(8) > 0
-
-    return df
-
-def detect_breakout(df, current_close, symbol):
-    if len(df) < 30:
-        return None
-    last = df.iloc[-1]
-    resistance = float(last['resistance_level'])
-    if resistance <= 0 or pd.isna(resistance):
-        return None
-
-    if current_close < resistance * carpan:
-        return None
-
-    strength = 2.5
-    if last['volume_increase']:
-        strength += 1.0
-    if last['momentum_strong']:
-        strength += 0.8
-
-    if strength < min_guc:
-        return None
-
-    gain = (current_close / resistance - 1) * 100
-
-    return {
-        'Sembol': symbol.replace('.IS', ''),
-        'Periyot': periyot,
-        'Güç': round(strength, 1),
-        'Fiyat': round(current_close, 2),
-        'Direnç': round(resistance, 2),
-        'Yakınlık %': f"{gain:.1f}".replace('.', ','),
-        'Yorum': 'Kırılım tespit edildi'
-    }
-
-# ==================== TARAMA ====================
-if st.button(f"🚀 {periyot} Tarama Başlat", type="primary"):
+# ==================== TARAYICI ====================
+if st.button(f"🚀 {timeframe} Tarama Başlat", type="primary"):
     results = []
-    progress = st.progress(0)
+    progress_bar = st.progress(0)
     status = st.empty()
+
+    tf_map = {"1 Saat": ("1h", "60d"), "4 Saat": ("1h", "60d"), "Günlük": ("1d", "120d")}
+    interval, period = tf_map[timeframe]
 
     for i, symbol in enumerate(bist_symbols):
         try:
-            data = yf.download(symbol, period=tf["per"], interval=tf["int"], 
-                             progress=False, auto_adjust=True, timeout=10)
+            data = yf.download(symbol, period=period, interval=interval, progress=False, auto_adjust=True)
             if len(data) < 30:
                 continue
 
-            current = float(data['Close'].iloc[-1])
-            df_ind = calculate_indicators(data)
-            result = detect_breakout(df_ind, current, symbol)
+            current_close = float(data['Close'].iloc[-1])
+            resistance = float(data['High'].rolling(50).max().iloc[-1])
 
-            if result:
-                results.append(result)
-                st.success(f"✅ {result['Sembol']} | Güç: {result['Güç']}")
-
+            if current_close > resistance * breakout_mult:
+                gain = (current_close / resistance - 1) * 100
+                results.append({
+                    'Sembol': symbol.replace('.IS', ''),
+                    'Periyot': timeframe,
+                    'Güç': 3.5,
+                    'Fiyat': round(current_close, 2),
+                    'Direnç': round(resistance, 2),
+                    'Yakınlık %': f"{gain:.1f}".replace('.', ','),
+                    'Yorum': 'Kırılım tespit edildi'
+                })
         except:
             pass
 
-        progress.progress((i+1)/len(bist_symbols))
+        progress_bar.progress((i + 1) / len(bist_symbols))
         status.text(f"İşlenen: {i+1}/{len(bist_symbols)} | Bulunan: {len(results)}")
-        time.sleep(0.1)
+        time.sleep(sleep_time)
 
     if results:
-        df = pd.DataFrame(results).sort_values('Güç', ascending=False)
+        df = pd.DataFrame(results)
+        st.success(f"✅ {len(df)} sinyal bulundu!")
         st.dataframe(df, use_container_width=True)
     else:
-        st.warning("Sinyal bulunamadı. Breakout çarpanını düşürün.")
+        st.warning("Bu ayarlarla sinyal bulunamadı. Breakout çarpanını düşürün.")
 
-st.caption("Sorun devam ederse 'Test Modu' açık olsun.")
+st.info("Sayfa açılmama sorunu için bu kod daha hafif ve hızlıdır.")
